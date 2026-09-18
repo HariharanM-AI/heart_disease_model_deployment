@@ -4,6 +4,10 @@ import numpy as np
 
 app = Flask(__name__)
 
+# Initialize variables as None to prevent 'not defined' errors
+model = None
+scaler = None
+
 # Load the exported model and scaler
 try:
     model = joblib.load('svc_model.joblib')
@@ -202,10 +206,10 @@ HTML_TEMPLATE = """
     <script>
         document.getElementById('predictorForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const resultDiv = document.getElementById('result');
             resultDiv.style.display = 'none';
-            
+
             const data = {
                 age: parseInt(document.getElementById('age').value),
                 sex: parseInt(document.getElementById('sex').value),
@@ -230,9 +234,9 @@ HTML_TEMPLATE = """
                     },
                     body: JSON.stringify(data)
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.status === 'success') {
                     resultDiv.style.display = 'block';
                     resultDiv.textContent = result.interpretation;
@@ -263,13 +267,19 @@ def home():
 
 @app.route('/predict', methods=['POST'])
 def predict():
+    # Guard against uninitialized model or scaler
+    if model is None or scaler is None:
+        return jsonify({
+            'status': 'error',
+            'message': 'Machine learning model or scaler is not loaded on the server.'
+        }), 503
+
     try:
         # Get the JSON data from the request
         data = request.get_json(force=True)
 
         # Expected features in the correct order:
-        features = [
-            data['age'], data['sex'], data['cp'], data['trestbps'], data['chol'],
+        features = [                data['age'], data['sex'], data['cp'], data['trestbps'], data['chol'],
             data['fbs'], data['restecg'], data['thalach'], data['exang'],
             data['oldpeak'], data['slope'], data['ca'], data['thal']
         ]
@@ -289,7 +299,7 @@ def predict():
             'interpretation': 'Heart Disease Detected' if prediction == 1 else 'No Heart Disease Detected'
         })
 
-    except KeyError as ke:
+    except KeyError as ke: 
         return jsonify({'status': 'error', 'message': f'Missing feature parameter: {str(ke)}'}), 400
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
